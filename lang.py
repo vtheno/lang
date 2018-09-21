@@ -50,7 +50,7 @@ class parser(Parser):
                 #e2,rest2 = self.expr( self.strip("=",rest1) )
                 defns,rest2 = self.defns( ts )
                 e3,rest3 = self.expr( self.strip("in",rest2) )
-                print( "let_defns:",defns,"|",e3 )
+                #print( "let_defns:",defns,"|",e3 )
                 return (Node("Let",[defns,e3]),rest3)
             elif t == '(': # need parent in there?
                 e_items,rest1 = self.items( ts )
@@ -208,13 +208,10 @@ class enviroment(object):
             Expected(f"apply {sym} no bound variable in {self.env}")
 
 def interpreter(ast,env):
-    print( ast.name,ast.rest )
+    #print( ast.name,ast.rest )
+    # can rewrite using state machine
     if ast.name == "Var":
-        val = env.apply(ast.rest[0])
-        if val:
-            return val
-        else:
-            Expected(f"not define {ast}")            
+        return env.apply(ast.rest[0])
     elif ast.name == "Paren":
         return interpreter(ast.rest[0],env)
     elif ast.name == "Num":

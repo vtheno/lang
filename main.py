@@ -35,4 +35,19 @@ def repl():
 # need implement infix need first scan readline infix define add to enviroment and remove it line
 # profound
 if __name__ == "__main__":
-    repl()
+    if len(sys.argv) > 1:
+        argv = sys.argv[1:]
+        filename = argv[0]
+        env = enviroment()
+        with open(filename,'r') as File:
+            stdin = File.read()
+            try:
+                inp = lex.Tokenise(stdin)
+                ast = parse(inp)
+                print("=>",ast)
+                val = interpreter(ast,env)
+                print("|>",val)
+            except Exception as e:
+                print("||",e )
+    else:
+        repl()
