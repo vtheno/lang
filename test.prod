@@ -4,4 +4,4 @@ let
     c = 4
     in 
     let (add,sub) = (fn (a,b) => a+b,fn (a,b) => a-b)
-    	in [fn (x) => x + 1](add(sub(a,b),c))
+    	in (fn (x) => x + 1) ( add ( sub (a,b) , c ) )

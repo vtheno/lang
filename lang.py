@@ -1,6 +1,33 @@
 #coding=utf-8
 from Lex import *
 from Parser import *
+"""
+E = E + E 
+  | E - E
+  | E * E
+  | E / E
+  | num
+equal
+E = E + T | E - T | T
+T = T * F | T / F | F
+F = num
+items = ( E rest_item )
+rest_item = , E | , | /\ buttom
+equal
+E = T Eopt
+Eopt = + T Eopt | - T Eopt | /\ buttom
+T = F Topt
+Topt = * F Topt | / F Topt | /\ buttom
+F = A Fopt
+    Fopt = ( E )  | /\ buttom
+equal
+level expr
+0     A = num | id
+1     F = A ( E ) | A
+2     T = T * F | T / F | F
+3     E = E + T | E - T | T
+"""
+
 class parser(Parser):
     def __init__(self,*args,**kw):
         Parser.__init__(self,*args,**kw)
@@ -54,10 +81,12 @@ class parser(Parser):
                 return (Node("Let",[defns,e3]),rest3)
             elif t == '(': # need parent in there?
                 e_items,rest1 = self.items( ts )
+                if len(e_items) == 1:
+                    return (Node("Paren",e_items),self.strip(")",rest1))
                 return (Node("Tuple",e_items),self.strip(')',rest1))
-            elif t == "[":
-                e1,rest1 = self.expr(ts)
-                return (Node("Paren",[e1]),self.strip("]",rest1))
+            #elif t == "[":
+            #    e1,rest1 = self.expr(ts)
+            #    return (Node("Paren",[e1]),self.strip("]",rest1))
             elif t == 'fn':
                 # FN = fn <variable> => <expr> 
                 x,xs = self.unpack(ts)
@@ -68,7 +97,7 @@ class parser(Parser):
                 else:
                     evar,rest1 = self.getid( ts )
                     ebody,rest2 = self.expr( self.strip("=>",rest1) )
-                    return (Node("Fn",[evar,ebody]),rest2)
+                    return (Node("Fn",[[evar],ebody]),rest2)
             elif t.isdigit():
                 num,rest1 = self.getnum( toks )
                 return (Node("Num",[num]),rest1)
@@ -77,32 +106,6 @@ class parser(Parser):
                 return (Node("Var",[var]),rest1)
         else:
             Expected(f"atom {toks}")
-    """
-    E = E + E 
-      | E - E
-      | E * E
-      | E / E
-      | num
-    equal
-    E = E + T | E - T | T
-    T = T * F | T / F | F
-    F = num
-    items = ( E rest_item )
-    rest_item = , E | , | /\ buttom
-    equal
-    E = T Eopt
-    Eopt = + T Eopt | - T Eopt | /\ buttom
-    T = F Topt
-    Topt = * F Topt | / F Topt | /\ buttom
-    F = A Fopt
-    Fopt = ( E )  | /\ buttom
-    equal
-    level expr
-    0     A = num | id
-    1     F = A ( E ) | A
-    2     T = T * F | T / F | F
-    3     E = E + T | E - T | T
-    """
     def expr(self,toks):
         e1,rest1 = self.term(toks)
         return self.eopt(e1,rest1) # rest is binop 
@@ -129,9 +132,9 @@ class parser(Parser):
     def fopt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t == "(":
-                e2,rest = self.atom(toks)
-                return self.fopt(Node("App",[expr,e2]),rest)
+            if t == "(": 
+                es,rest = self.atom(toks)#self.items(ts)
+                return self.fopt(Node("App",[expr,es]),rest)
         return (expr,toks)
     def items(self,toks):
         #if toks:
@@ -141,8 +144,6 @@ class parser(Parser):
             return self.rest_item( [e1] ,rest1)
         elif t == ')':
             return ([],toks)
-        elif t == ',' and self.unpack(ts)[0] == ')':
-            return ([],ts)
         else:
             Expected(f"items {toks}")
     def rest_item(self,e1,toks):
@@ -186,7 +187,7 @@ class Extend(metaclass=Env):
         self.val = val
         self.env = env
     def __repr__(self):
-        return f"[ {self.__name__} {self.sym} , {self.val} , {repr(self.env)} ]"
+        return f"[ {self.sym}:{self.val} , {repr(self.env)} ]"
 class enviroment(object):
     def __init__(self,init=Empty()):
         self.env = init
@@ -219,15 +220,48 @@ def interpreter(ast,env):
     elif ast.name == "Tuple":
         return tuple([interpreter(_ast,env) for _ast in ast.rest])
     elif ast.name == "Let":
+        """
+        let (hd,tail) = (1,2,3,4)
+            in hd
+        => 1
+        #  if in tail then => (2,3,4)
+        """
         for k,v in ast.rest[0]:
-            print("let:",k,v)
-            if len(k) > 1 and v.name == "Tuple":
-                for name,val in zip(k,v.rest):
-                    env = env.extend(name,interpreter(val,env))
+            val = interpreter(v,env) 
+            val = val if isinstance(val,tuple) else [val]
+            len_k = len(k)
+            if len_k == 1 and isinstance(val,tuple) and len(val) != 1:
+                val = [val]
+            len_v = len(val)
+            if len_k == len_v:
+                for n,v in zip(k,val):
+                    env = env.extend(n,v)
+            elif len_k < len_v:
+                Expected(f"value unpack to variable to greate ( have {len_v} value to {len_k} variable")
+            elif len_k > len_v and len_v > 0:
+                Expected(f"value unpack to variable to less ( have {len_v} value to {len_k} variable {ast}")
             else:
-                env = env.extend(k[0],interpreter(v,env))
+                Expected(f"value can't unpack to variable")
         print("let_env:",env) 
         return interpreter(ast.rest[1],env)
+    elif ast.name == "App":
+        fun = interpreter(ast.rest[0],env) 
+        val = interpreter(ast.rest[1],env)
+        val = val if isinstance(val,tuple) else [val]
+        sym = fun.rest[0]
+        body = fun.rest[1]
+        len_s = len(sym)
+        if len_s == 1 and isinstance(val,tuple) and len(val) != 1:
+            val = [val]
+        print('app---:',sym,val)
+        len_v = len(val)
+        if len_s == len_v:
+            for s,v in zip(sym,val):
+                env = env.extend(s,v)
+            print( "env:",env )
+            return interpreter(body,env)
+        else:
+            Expected(f"function application args not equal {len_s} {len_v}")
     elif ast.name == "If":
         cond,true,false = tuple(ast.rest)
         cond_val = interpreter(cond,env)
@@ -236,19 +270,6 @@ def interpreter(ast,env):
         return interpreter(false,env)
     elif ast.name == "Fn":
         return ast
-    elif ast.name == "App":
-        fun = interpreter(ast.rest[0],env)
-        val = interpreter(ast.rest[1],env) # always retune a  tuple
-        sym = fun.rest[0]
-        body = fun.rest[1]
-        print( "App:" ,sym,val )
-        if len(sym) == len(val):
-            for s,v in zip(sym,val):
-                env = env.extend(s,v)
-            print( "env:",env )
-            return interpreter(body,env)
-        else:
-            Expected(f"function application args not equal {len(sym)} {len(val)}")
     elif ast.name in ["+","-","*","/"]:
         l,r = ast.rest[0],ast.rest[1]
         if ast.name == "+":
@@ -260,6 +281,6 @@ def interpreter(ast,env):
         elif ast.name == '/':
             return interpreter(l,env) / interpreter(r,env)
     else:
-        Expected(f"not define {ast}")
-
+        Expected(f"not implement {ast}")
 __all__ = ["lex","parse","interpreter","Empty","Extend","enviroment"]
+# implement infixop and level define by the grammar level table
