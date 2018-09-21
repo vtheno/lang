@@ -1,4 +1,5 @@
 #coding=utf-8
+# add lex support float number
 class Ident(object):
     def __init__(self,sym):
         self.sym = sym
@@ -87,4 +88,3 @@ print( lex.Tokenise(inp) )
 print( {Ident('c'):233} )
 """
 __all__ = ["Lex","GetNextTokenErr"]
-# implement static file server

@@ -24,7 +24,7 @@ class parser(Parser):
             else: # if (a,b,c) = 2 then a = b = c = 2 elif (a,b,c) = (1,2,3) then a = 1,b = 2,c = 3
                 e_var,rest1 = self.getid( toks )
                 e_val,rest2 = self.expr ( self.strip("=",rest1) )
-                return ( (e_var,e_val),rest2 )
+                return ( ([e_var],e_val),rest2 )
         else:
             Expected(f"defn: {toks}")
     def defnopt(self,expr,toks):
@@ -50,6 +50,7 @@ class parser(Parser):
                 #e2,rest2 = self.expr( self.strip("=",rest1) )
                 defns,rest2 = self.defns( ts )
                 e3,rest3 = self.expr( self.strip("in",rest2) )
+                print( "let_defns:",defns,"|",e3 )
                 return (Node("Let",[defns,e3]),rest3)
             elif t == '(': # need parent in there?
                 e_items,rest1 = self.items( ts )
@@ -222,16 +223,13 @@ def interpreter(ast,env):
         return tuple([interpreter(_ast,env) for _ast in ast.rest])
     elif ast.name == "Let":
         for k,v in ast.rest[0]:
-            #print("let:",k,v)
-            if len(k) > 1:
-                if v.name == "Tuple":
-                    for name,val in zip(k,v.rest):
-                        env = env.extend(name,interpreter(val,env))
-                else:
-                    for name in k:
-                        env = env.extend(name,interpreter(v,env))
+            print("let:",k,v)
+            if len(k) > 1 and v.name == "Tuple":
+                for name,val in zip(k,v.rest):
+                    env = env.extend(name,interpreter(val,env))
             else:
-                env = env.extend(k,interpreter(v,env))
+                env = env.extend(k[0],interpreter(v,env))
+        print("let_env:",env) 
         return interpreter(ast.rest[1],env)
     elif ast.name == "If":
         cond,true,false = tuple(ast.rest)
