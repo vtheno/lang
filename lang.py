@@ -171,15 +171,45 @@ separators = [" ","\n","\t"]
 lex = Lex(spectab,keywords,separators)
 parse = parser(keywords).read
 
-def extendEnv(*args,**kw):
+class Env(type):
+    def __new__(cls,name,parent,attrs):
+        attrs["__name__"] = name
+        if "__repr__" not in attrs.keys():
+            attrs["__repr__"] = lambda self:self.__name__
+        return type.__new__(cls,name,parent,attrs)
+class Empty(metaclass=Env):
     pass
-def applyEnv(*args,**kw):
-    pass
+class Extend(metaclass=Env):
+    def __init__(self,sym,val,env):
+        self.sym = sym
+        self.val = val
+        self.env = env
+    def __repr__(self):
+        return f"[ {self.__name__} {self.sym} , {self.val} , {repr(self.env)} ]"
+class enviroment(object):
+    def __init__(self,init=Empty()):
+        self.env = init
+    def __repr__(self):
+        return repr(self.env)
+    def extend(self,sym,val):
+        return enviroment( Extend(sym,val,self.env) )
+    def apply(self,sym):
+        # get sym
+        temp = self.env
+        while not isinstance(temp,Empty):
+            if isinstance(temp,enviroment):
+                temp = temp.env
+            if isinstance(temp,Extend):
+                ss,vv,temp = temp.sym,temp.val,temp.env
+                if sym == ss:
+                    return vv
+        else:
+            Expected(f"apply {sym} no bound variable in {self.env}")
 
 def interpreter(ast,env):
     print( ast.name,ast.rest )
     if ast.name == "Var":
-        val = env.get(ast.rest[0],None)
+        val = env.apply(ast.rest[0])
         if val:
             return val
         else:
@@ -192,16 +222,16 @@ def interpreter(ast,env):
         return tuple([interpreter(_ast,env) for _ast in ast.rest])
     elif ast.name == "Let":
         for k,v in ast.rest[0]:
-            print("let:",k,v)
+            #print("let:",k,v)
             if len(k) > 1:
                 if v.name == "Tuple":
                     for name,val in zip(k,v.rest):
-                        env[name] = interpreter(val,env)
+                        env = env.extend(name,interpreter(val,env))
                 else:
                     for name in k:
-                        env[name] = interpreter(v,env)
+                        env = env.extend(name,interpreter(v,env))
             else:
-                env[k] = interpreter(v,env)
+                env = env.extend(k,interpreter(v,env))
         return interpreter(ast.rest[1],env)
     elif ast.name == "If":
         cond,true,false = tuple(ast.rest)
@@ -209,6 +239,21 @@ def interpreter(ast,env):
         if cond_val:
             return interpreter(true,env)
         return interpreter(false,env)
+    elif ast.name == "Fn":
+        return ast
+    elif ast.name == "App":
+        fun = interpreter(ast.rest[0],env)
+        val = interpreter(ast.rest[1],env) # always retune a  tuple
+        sym = fun.rest[0]
+        body = fun.rest[1]
+        print( "App:" ,sym,val )
+        if len(sym) == len(val):
+            for s,v in zip(sym,val):
+                env = env.extend(s,v)
+            print( "env:",env )
+            return interpreter(body,env)
+        else:
+            Expected(f"function application args not equal {len(sym)} {len(val)}")
     elif ast.name in ["+","-","*","/"]:
         l,r = ast.rest[0],ast.rest[1]
         if ast.name == "+":
@@ -222,4 +267,4 @@ def interpreter(ast,env):
     else:
         Expected(f"not define {ast}")
 
-__all__ = ["lex","parse","interpreter"]
+__all__ = ["lex","parse","interpreter","Empty","Extend","enviroment"]

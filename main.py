@@ -11,10 +11,9 @@ def input (symbol) :
     return result
 
 def repl():
-    env = {
-        'a':2,
-        'b':3,
-    }
+    env = enviroment()
+    #env = env.extend('a',1)
+    #env = env.extend('b',2)
     try:
         while 1:
             stdin = input(">> ")
@@ -34,5 +33,6 @@ def repl():
     except KeyboardInterrupt:
         print('\b\b\brepl exit.')
 # need implement infix need first scan readline infix define add to enviroment and remove it line
+# profound
 if __name__ == "__main__":
     repl()
