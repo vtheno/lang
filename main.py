@@ -5,9 +5,15 @@ import sys
 from pprint import pprint
 env = enviroment()
 env = env.extend("~",interpreter(parse(lex.Tokenise("fn x => 0 - x")),env) )
-parse(lex.Tokenise("infix 1 ::"))
+parse(lex.Tokenise("infixr 1 ::"))
 env = env.extend('::',interpreter(parse(lex.Tokenise("fn (a,b) => (a,b)")),env) )
 env = env.extend('$',interpreter(parse(lex.Tokenise("fn a => (fn b => a b)")),env))
+env = env.extend('Y',interpreter(parse(lex.Tokenise("""
+fn f =>
+let 
+    self = fn x => (fn n => (f (x x)) n)
+in  fn n => (f (self self)) n
+""")),env))
 print( "init_env:",end='')
 pprint(  env )
 def input (symbol) :

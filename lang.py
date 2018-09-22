@@ -287,12 +287,6 @@ def interpreter(ast,env):
     elif ast.name == "Tuple":
         return tuple([interpreter(_ast,env) for _ast in ast.rest])
     elif ast.name == "Let":
-        """
-        let (hd,tail) = (1,2,3,4)
-            in hd
-        => 1
-        #  if in tail then => (2,3,4)
-        """
         for k,v in ast.rest[0]:
             val = interpreter(v,env) 
             val = val if isinstance(val,tuple) else [val]
@@ -303,6 +297,8 @@ def interpreter(ast,env):
             if len_k == len_v:
                 for n,v in zip(k,val):
                     env = env.extend(n,v)
+                    #if isinstance(v,Proc):
+                    #    v.env = env
             elif len_k < len_v:
                 Expected(f"value unpack to variable to greate ( have {len_v} value to {len_k} variable")
             elif len_k > len_v and len_v > 0:
@@ -367,4 +363,4 @@ def interpreter(ast,env):
     else:
         Expected(f"not implement {ast}")
 __all__ = ["lex","parse","interpreter","Empty","Extend","enviroment"]
-# implement infixop and level define by the grammar level table
+# implement a user datatype define
