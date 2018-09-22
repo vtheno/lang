@@ -162,8 +162,8 @@ class parser(Parser):
         if toks:
             t,ts = self.unpack(toks)
             if t == "(" or t not in self.keys: # how process the apply level
-                es,rest = self.atom(toks)
-                return self.fopt(Node("App",[expr,es]),rest)
+                es,rest = self.term(toks)
+                return self.eopt(Node("App",[expr,es]),rest)
         return (expr,toks)
     def term(self,toks):
         e1,rest1 = self.fator(toks)
