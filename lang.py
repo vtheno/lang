@@ -8,11 +8,23 @@ E = E + E
   | E / E
   | num
 equal
-E = E + T | E - T | T
-T = T * F | T / F | F
+E = E + T | E - T | T      ;; this is left assoc
+T = T * F | T / F | F      ;; this is left assoc
 F = num
+----------
+A    =  f1 Aopt | ... | fn Aopt
+Aopt =  g1 Aopt | ... | gm Aopt | /\ 
+----------
+E = T + E | T - E | T      ;; this is right assoc
+T = F * T | F / T | F      ;; this is right assoc
+F = num
+----------
+E    = T Eopt
+Eopt = + T Eopt | - T Eopt | /\ 
+----------
 items = ( E rest_item )
 rest_item = , E | , | /\ buttom
+----------
 equal
 E = T Eopt
 Eopt = + T Eopt | - T Eopt | /\ buttom
@@ -31,6 +43,11 @@ level expr
 class parser(Parser):
     def __init__(self,*args,**kw):
         Parser.__init__(self,*args,**kw)
+        self.infix_tab = [ 
+            [ ["*","/"], [ ] ], # 0
+            [ ["+","-"], [ ] ], # 1
+        ]
+        self.user_infix = [ ]
     def idsopt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
@@ -84,9 +101,6 @@ class parser(Parser):
                 if len(e_items) == 1:
                     return (Node("Paren",e_items),self.strip(")",rest1))
                 return (Node("Tuple",e_items),self.strip(')',rest1))
-            #elif t == "[":
-            #    e1,rest1 = self.expr(ts)
-            #    return (Node("Paren",[e1]),self.strip("]",rest1))
             elif t == 'fn':
                 # FN = fn <variable> => <expr> 
                 x,xs = self.unpack(ts)
@@ -98,6 +112,36 @@ class parser(Parser):
                     evar,rest1 = self.getid( ts )
                     ebody,rest2 = self.expr( self.strip("=>",rest1) )
                     return (Node("Fn",[[evar],ebody]),rest2)
+            elif t == "infix":
+                assoc = 0
+                len_infix = len(self.infix_tab)
+                x,xs = self.unpack(ts)
+                if x.isdigit():
+                    level,rest1 = self.getnum( ts )
+                    if level >= len_infix:
+                        Expected(f"max infix level {len_infix - 1} not {level}")
+                    symop,rest2 = self.getid( rest1 )
+                else:
+                    level = 0
+                    symop,rest2 = self.getid( ts )
+                self.user_infix += [symop]
+                self.infix_tab[level][assoc] += [symop]
+                return (Node("Infix",[level,assoc,symop]), rest2)
+            elif t == "infixr":
+                assoc = 1
+                len_infix = len(self.infix_tab)
+                x,xs = self.unpack(ts)
+                if x.isdigit():
+                    level,rest1 = self.getnum( ts )
+                    if level >= len_infix:
+                        Expected(f"max infix level {len_infix - 1} not {level}")
+                    symop,rest2 = self.getid( rest1 )
+                else:
+                    level = 0
+                    symop,rest2 = self.getid( ts )
+                self.user_infix += [symop]
+                self.infix_tab[level][assoc] += [symop]
+                return (Node("Infixr",[level,assoc,symop]), rest2)
             elif t.isdigit():
                 num,rest1 = self.getnum( toks )
                 return (Node("Num",[num]),rest1)
@@ -112,8 +156,11 @@ class parser(Parser):
     def eopt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t in ["+","-"]:
-                e2,rest = self.term(ts)
+            if t in self.infix_tab[1][0]:
+                e2,rest = self.term(ts) # left assoc  => 1 + 2 + 3 => (1 + 2) + 3 => (+ (+ 1 2) 3)
+                return self.eopt(Node(t,[expr,e2]),rest)
+            elif t in self.infix_tab[1][1]:
+                e2,rest = self.expr(ts) # right assoc => 1 + 2 + 3 => 1 + (2 + 3) => (+ 1 (+ 2 3))
                 return self.eopt(Node(t,[expr,e2]),rest)
         return (expr,toks)
     def term(self,toks):
@@ -122,8 +169,11 @@ class parser(Parser):
     def topt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t in ["*","/"]:
-                e2,rest = self.fator(ts)
+            if t in self.infix_tab[0][0]:
+                e2,rest = self.fator(ts) # left
+                return self.topt(Node(t,[expr,e2]),rest)
+            elif t in self.infix_tab[0][1]:
+                e2,rest = self.expr(ts) # right 
                 return self.topt(Node(t,[expr,e2]),rest)
         return (expr,toks)
     def fator(self,toks):
@@ -132,7 +182,8 @@ class parser(Parser):
     def fopt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t == "(": 
+            print( "fopt:",t,ts)
+            if t == "(":#self.infix_tab[0][0]: 
                 es,rest = self.atom(toks)#self.items(ts)
                 return self.fopt(Node("App",[expr,es]),rest)
         return (expr,toks)
@@ -163,15 +214,17 @@ class parser(Parser):
 keywords = ["if","then","else",
             "let","=","in",
             "fn",
+            "infix","infixr",
             "=>",":",
-            "[","]",
             "(",",",")","+","-","*","/"]
 spectab = {
     "=":[">"],
+    ":":[":"],
 }
 separators = [" ","\n","\t"]
 lex = Lex(spectab,keywords,separators)
-parse = parser(keywords).read
+p   = parser(keywords)
+parse = p.read
 
 class Env(type):
     def __new__(cls,name,parent,attrs):
@@ -253,12 +306,10 @@ def interpreter(ast,env):
         len_s = len(sym)
         if len_s == 1 and isinstance(val,tuple) and len(val) != 1:
             val = [val]
-        print('app---:',sym,val)
         len_v = len(val)
         if len_s == len_v:
             for s,v in zip(sym,val):
                 env = env.extend(s,v)
-            print( "env:",env )
             return interpreter(body,env)
         else:
             Expected(f"function application args not equal {len_s} {len_v}")
@@ -280,6 +331,16 @@ def interpreter(ast,env):
             return interpreter(l,env) * interpreter(r,env)
         elif ast.name == '/':
             return interpreter(l,env) / interpreter(r,env)
+    elif ast.name in p.user_infix:
+        fun = Node("Var",[ast.name])
+        arg = Node("Tuple",ast.rest)
+        return interpreter( Node("App",[fun,arg]),env)
+    elif ast.name == 'Infix':
+        level,assoc,symop = tuple(ast.rest)
+        return Node("Var",[symop])
+    elif ast.name == 'Infixr':
+        level,assoc,symop = tuple(ast.rest)
+        return Node("Var",[symop])
     else:
         Expected(f"not implement {ast}")
 __all__ = ["lex","parse","interpreter","Empty","Extend","enviroment"]

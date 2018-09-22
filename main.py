@@ -6,6 +6,7 @@ from pprint import pprint
 env = enviroment()
 env = env.extend('hd',parse(lex.Tokenise("fn tup => let (a,b) = tup in a")) )
 env = env.extend('tl',parse(lex.Tokenise("fn tup => let (a,b) = tup in b")) )
+env = env.extend('::',parse(lex.Tokenise("fn (a,b) => (a,b)")) )
 def input (symbol) :
     result= ''
     sys.stdout.write('\r' + symbol)

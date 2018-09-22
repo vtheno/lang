@@ -34,7 +34,7 @@ class Parser(object):
     def read(self,inp):
         out,rest = self.expr(inp)
         if rest:
-            Expected(f"not all parser {rest}")
+            Expected(f"not all parser {rest}\n\t{out}")
         return out
 
 __all__ = ["Parser","Node",
