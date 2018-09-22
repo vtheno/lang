@@ -22,7 +22,7 @@ class Parser(object):
         if not t.isdigit() and t not in self.keys:
             return (t,ts)
         else:
-            Expected(f"Id '{t}' is num or {self.keys} have '{t}'")
+            Expected(f"Id '{t}' is num or {self.keys} have '{t}'\n {toks}")
     def getnum(self,toks):
         t,ts = self.unpack(toks)
         if t.isdigit():

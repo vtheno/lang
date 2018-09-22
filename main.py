@@ -4,9 +4,12 @@ from Parser import Node
 import sys
 from pprint import pprint
 env = enviroment()
-env = env.extend('hd',parse(lex.Tokenise("fn tup => let (a,b) = tup in a")) )
-env = env.extend('tl',parse(lex.Tokenise("fn tup => let (a,b) = tup in b")) )
-env = env.extend('::',parse(lex.Tokenise("fn (a,b) => (a,b)")) )
+#env = env.extend('hd',parse(lex.Tokenise("fn tup => let (a,b) = tup in a")) )
+#env = env.extend('tl',parse(lex.Tokenise("fn tup => let (a,b) = tup in b")) )
+env = env.extend('::',interpreter(parse(lex.Tokenise("fn (a,b) => (a,b)")),env) )
+env = env.extend('$',interpreter(parse(lex.Tokenise("fn a => (fn b => a b)")),env))
+print( "init_env:",end='')
+pprint(  env )
 def input (symbol) :
     result= ''
     sys.stdout.write('\r' + symbol)

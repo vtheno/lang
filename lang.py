@@ -38,6 +38,11 @@ level expr
 1     F = A ( E ) | A
 2     T = T * F | T / F | F
 3     E = E + T | E - T | T
+infix level table
+     A = num | id | if | let | fn | tuple | infix
+     F = A ( F ) | A
+0    T = F * T | T / F | F
+1    E = E + T | E - T | T
 """
 
 class parser(Parser):
@@ -96,8 +101,8 @@ class parser(Parser):
                 e3,rest3 = self.expr( self.strip("in",rest2) )
                 #print( "let_defns:",defns,"|",e3 )
                 return (Node("Let",[defns,e3]),rest3)
-            elif t == '(': # need parent in there?
-                e_items,rest1 = self.items( ts )
+            elif t == '(': 
+                e_items,rest1 = self.items( ts ) # self.items : [str] -> ([expr],[str])
                 if len(e_items) == 1:
                     return (Node("Paren",e_items),self.strip(")",rest1))
                 return (Node("Tuple",e_items),self.strip(')',rest1))
@@ -180,11 +185,11 @@ class parser(Parser):
         e1,rest1 = self.atom(toks)
         return self.fopt(e1,rest1)
     def fopt(self,expr,toks):
+        #print( expr, toks )
         if toks:
             t,ts = self.unpack(toks)
-            print( "fopt:",t,ts)
-            if t == "(":#self.infix_tab[0][0]: 
-                es,rest = self.atom(toks)#self.items(ts)
+            if t == "(" or t not in self.keys :
+                es,rest = self.atom(toks)
                 return self.fopt(Node("App",[expr,es]),rest)
         return (expr,toks)
     def items(self,toks):
@@ -211,6 +216,7 @@ class parser(Parser):
                 return (e1,toks)
         else:
             return (e1,toks)
+
 keywords = ["if","then","else",
             "let","=","in",
             "fn",
@@ -240,7 +246,7 @@ class Extend(metaclass=Env):
         self.val = val
         self.env = env
     def __repr__(self):
-        return f"[ {self.sym}:{self.val} , {repr(self.env)} ]"
+        return f"[ '{self.sym}':{self.val} , {repr(self.env)} ]"
 class enviroment(object):
     def __init__(self,init=Empty()):
         self.env = init
@@ -260,13 +266,21 @@ class enviroment(object):
                     return vv
         else:
             Expected(f"apply {sym} no bound variable in {self.env}")
-
+class Proc(object):
+    def __init__(self,var,body,env):
+        self.var = var
+        self.body = body
+        self.env = env
+    def __repr__(self):
+        return f"Proc({self.var})"
 def interpreter(ast,env):
     #print( ast.name,ast.rest )
     # can rewrite using state machine
     if ast.name == "Var":
+        print( "var:",ast.name,ast.rest[0],env )
         return env.apply(ast.rest[0])
     elif ast.name == "Paren":
+        #print("paren_env:",env)
         return interpreter(ast.rest[0],env)
     elif ast.name == "Num":
         return ast.rest[0]
@@ -298,21 +312,26 @@ def interpreter(ast,env):
         print("let_env:",env) 
         return interpreter(ast.rest[1],env)
     elif ast.name == "App":
-        fun = interpreter(ast.rest[0],env) 
+        fun = interpreter(ast.rest[0],env)
         val = interpreter(ast.rest[1],env)
-        val = val if isinstance(val,tuple) else [val]
-        sym = fun.rest[0]
-        body = fun.rest[1]
-        len_s = len(sym)
-        if len_s == 1 and isinstance(val,tuple) and len(val) != 1:
-            val = [val]
-        len_v = len(val)
-        if len_s == len_v:
-            for s,v in zip(sym,val):
-                env = env.extend(s,v)
-            return interpreter(body,env)
+        if isinstance(fun,Proc):
+            val = val if isinstance(val,tuple) else [val]
+            sym = fun.var
+            body = fun.body
+            env = fun.env
+            len_s = len(sym)
+            if len_s == 1 and isinstance(val,tuple) and len(val) != 1:
+                val = [val]
+            len_v = len(val)
+            if len_s == len_v:
+                for s,v in zip(sym,val):
+                    env = env.extend(s,v)
+                print( "app_env:",env )
+                return interpreter(body,env)
+            else:
+                Expected(f"function application args not equal {len_s} {len_v}")
         else:
-            Expected(f"function application args not equal {len_s} {len_v}")
+            Expected(f"value {val} can't apply {fun}")
     elif ast.name == "If":
         cond,true,false = tuple(ast.rest)
         cond_val = interpreter(cond,env)
@@ -320,7 +339,8 @@ def interpreter(ast,env):
             return interpreter(true,env)
         return interpreter(false,env)
     elif ast.name == "Fn":
-        return ast
+        var,body = ast.rest[0],ast.rest[1]
+        return Proc(var,body,env)
     elif ast.name in ["+","-","*","/"]:
         l,r = ast.rest[0],ast.rest[1]
         if ast.name == "+":
