@@ -40,9 +40,9 @@ level expr
 3     E = E + T | E - T | T
 infix level table
      A = num | id | if | let | fn | tuple | infix
-     F = A ( F ) | A
-0    T = F * T | T / F | F
-1    E = E + T | E - T | T
+0    F = F * A | F / A | A
+1    T = T + F | T - F | F
+2    E = E T | E ( T ) | T
 """
 
 class parser(Parser):
@@ -161,12 +161,9 @@ class parser(Parser):
     def eopt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t in self.infix_tab[1][0]:
-                e2,rest = self.term(ts) # left assoc  => 1 + 2 + 3 => (1 + 2) + 3 => (+ (+ 1 2) 3)
-                return self.eopt(Node(t,[expr,e2]),rest)
-            elif t in self.infix_tab[1][1]:
-                e2,rest = self.expr(ts) # right assoc => 1 + 2 + 3 => 1 + (2 + 3) => (+ 1 (+ 2 3))
-                return self.eopt(Node(t,[expr,e2]),rest)
+            if t == "(" or t not in self.keys: # how process the apply level
+                es,rest = self.atom(toks)
+                return self.fopt(Node("App",[expr,es]),rest)
         return (expr,toks)
     def term(self,toks):
         e1,rest1 = self.fator(toks)
@@ -174,12 +171,12 @@ class parser(Parser):
     def topt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t in self.infix_tab[0][0]:
-                e2,rest = self.fator(ts) # left
-                return self.topt(Node(t,[expr,e2]),rest)
-            elif t in self.infix_tab[0][1]:
-                e2,rest = self.expr(ts) # right 
-                return self.topt(Node(t,[expr,e2]),rest)
+            if t in self.infix_tab[1][0]:
+                e2,rest = self.term(ts) # left assoc  => 1 + 2 + 3 => (1 + 2) + 3 => (+ (+ 1 2) 3)
+                return self.eopt(Node(t,[expr,e2]),rest)
+            elif t in self.infix_tab[1][1]:
+                e2,rest = self.expr(ts) # right assoc => 1 + 2 + 3 => 1 + (2 + 3) => (+ 1 (+ 2 3))
+                return self.eopt(Node(t,[expr,e2]),rest)
         return (expr,toks)
     def fator(self,toks):
         e1,rest1 = self.atom(toks)
@@ -188,9 +185,12 @@ class parser(Parser):
         #print( expr, toks )
         if toks:
             t,ts = self.unpack(toks)
-            if t == "(" or t not in self.keys :
-                es,rest = self.atom(toks)
-                return self.fopt(Node("App",[expr,es]),rest)
+            if t in self.infix_tab[0][0]:
+                e2,rest = self.fator(ts) # left
+                return self.topt(Node(t,[expr,e2]),rest)
+            elif t in self.infix_tab[0][1]:
+                e2,rest = self.expr(ts) # right 
+                return self.topt(Node(t,[expr,e2]),rest)
         return (expr,toks)
     def items(self,toks):
         #if toks:
@@ -277,7 +277,7 @@ def interpreter(ast,env):
     #print( ast.name,ast.rest )
     # can rewrite using state machine
     if ast.name == "Var":
-        print( "var:",ast.name,ast.rest[0],env )
+        #print( "var:",ast.name,ast.rest[0],env )
         return env.apply(ast.rest[0])
     elif ast.name == "Paren":
         #print("paren_env:",env)
@@ -314,10 +314,12 @@ def interpreter(ast,env):
     elif ast.name == "App":
         fun = interpreter(ast.rest[0],env)
         val = interpreter(ast.rest[1],env)
+        print( "apply:",fun,val )
         if isinstance(fun,Proc):
             val = val if isinstance(val,tuple) else [val]
             sym = fun.var
             body = fun.body
+            print( "apply:",env,fun.env )
             env = fun.env
             len_s = len(sym)
             if len_s == 1 and isinstance(val,tuple) and len(val) != 1:
@@ -354,6 +356,7 @@ def interpreter(ast,env):
     elif ast.name in p.user_infix:
         fun = Node("Var",[ast.name])
         arg = Node("Tuple",ast.rest)
+        print( fun,arg )
         return interpreter( Node("App",[fun,arg]),env)
     elif ast.name == 'Infix':
         level,assoc,symop = tuple(ast.rest)
