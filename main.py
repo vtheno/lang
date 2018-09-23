@@ -1,21 +1,28 @@
 #coding=utf-8
 from lang import *
 from Parser import Node
+from datatype import enviroment
+from eval import interpreter
 import sys
 from pprint import pprint
 env = enviroment()
 env = env.extend("~",interpreter(parse(lex.Tokenise("fn x => 0 - x")),env) )
-parse(lex.Tokenise("infixr 1 ::"))
+env = env.extend('abs',interpreter(parse(lex.Tokenise("fn i => if i then i else 0 - i")),env))
+parse(lex.Tokenise("infix ::"))
 env = env.extend('::',interpreter(parse(lex.Tokenise("fn (a,b) => (a,b)")),env) )
 env = env.extend('$',interpreter(parse(lex.Tokenise("fn a => (fn b => a b)")),env))
+parse(lex.Tokenise("infix 3 ."))
+env = env.extend('.',interpreter(parse(lex.Tokenise("fn (obj,method) => (method obj)")),env))
 env = env.extend('Y',interpreter(parse(lex.Tokenise("""
 fn f =>
 let 
     self = fn x => (fn n => (f (x x)) n)
 in  fn n => (f (self self)) n
 """)),env))
+
 print( "init_env:",end='')
 pprint(  env )
+pprint( p.infix_tab )
 def input (symbol) :
     result= ''
     sys.stdout.write('\r' + symbol)
@@ -33,6 +40,8 @@ def repl():
             if inp == ":q":
                 print('\nrepl exit.')
                 break
+            elif inp == ":e":
+                pprint(env)
             else:
                 try:
                     inp = lex.Tokenise(stdin)

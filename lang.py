@@ -49,25 +49,19 @@ class parser(Parser):
     def __init__(self,*args,**kw):
         Parser.__init__(self,*args,**kw)
         self.infix_tab = [ 
-            [ ["*","/"], [ ] ], # 0
-            [ ["+","-"], [ ] ], # 1
+            [ [ ]      , [ ] ], # 0
+            [ ["*","/"], [ ] ], # 1
+            [ ["+","-"], [ ] ], # 2
+            [ [ ]      , [ ] ], # 3
+            # 4 is expr ,eopt 
         ]
         self.user_infix = [ ]
-    def idsopt(self,expr,toks):
-        if toks:
-            t,ts = self.unpack(toks)
-            if t == ',':
-                e2,rest2 = self.getid(ts)
-                return self.idsopt( expr + [e2],rest2)
-        return (expr,toks)
-    def getids(self,toks):
-        e1,rest1 = self.getid(toks)
-        return self.idsopt( [e1] ,rest1 ) # rest is binop 
+        self.starts = ["if","let","(","fn","infix","infixr"]
     def defn(self,toks):
         if toks:
             x,xs = self.unpack(toks)
             if x == '(':
-                e_var,rest1 = self.getids( xs )
+                e_var,rest1 = self.ids( xs )
                 e_val,rest2 = self.expr( self.strip("=",self.strip(')',rest1)) )
                 return ( (e_var,e_val),rest2 )
             else: # if (a,b,c) = 2 then a = b = c = 2 elif (a,b,c) = (1,2,3) then a = 1,b = 2,c = 3
@@ -102,16 +96,16 @@ class parser(Parser):
                 #print( "let_defns:",defns,"|",e3 )
                 return (Node("Let",[defns,e3]),rest3)
             elif t == '(': 
-                e_items,rest1 = self.items( ts ) # self.items : [str] -> ([expr],[str])
+                e_items,rest1 = self.items( ts )
                 if len(e_items) == 1:
                     return (Node("Paren",e_items),self.strip(")",rest1))
                 return (Node("Tuple",e_items),self.strip(')',rest1))
             elif t == 'fn':
-                # FN = fn <variable> => <expr> 
                 x,xs = self.unpack(ts)
                 if x == '(':
-                    evar,rest1 = self.getids( xs )
-                    ebody,rest2 = self.expr( self.strip("=>",self.strip(')',rest1)) )
+                    evar,rest1 = self.ids( xs )
+                    rest1 = self.strip(")",rest1)
+                    ebody,rest2 = self.expr( self.strip("=>",rest1) )
                     return (Node("Fn",[evar,ebody]),rest2)
                 else:
                     evar,rest1 = self.getid( ts )
@@ -152,18 +146,61 @@ class parser(Parser):
                 return (Node("Num",[num]),rest1)
             else:
                 var,rest1 = self.getid( toks )
-                return (Node("Var",[var]),rest1)
+                val = Node("Var",[var])
+                return (val,rest1)
         else:
             Expected(f"atom {toks}")
-    def expr(self,toks):
-        e1,rest1 = self.term(toks)
-        return self.eopt(e1,rest1) # rest is binop 
-    def eopt(self,expr,toks):
+    def ids(self,toks):
+        t,ts = self.unpack(toks)
+        if t == ")":
+            return ([ ],toks)
+        else:
+            id,rest = self.getid(toks)
+            return self.idsopt( [id],rest)
+    def idsopt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t == "(" or t not in self.keys: # how process the apply level
-                es,rest = self.term(toks)
+            if t == ",":
+                e2,rest2 = self.getid(ts)
+                return self.idsopt(expr + [e2],rest2)
+        return (expr,toks)
+    def items(self,toks):
+        t,ts = self.unpack(toks)
+        if t == ")":
+            return ([ ],toks)
+        else:
+            e1,rest = self.expr(toks)
+            return self.itemsopt( [e1],rest)
+    def itemsopt(self,expr,toks):
+        if toks:
+            t,ts = self.unpack(toks)
+            if t == ",":
+                e2,rest2 = self.expr(ts)
+                return self.itemsopt(expr + [e2],rest2)
+        return (expr,toks)
+    def expr(self,toks):
+        e1,rest1 = self.level3(toks)
+        return self.eopt(e1,rest1)
+    def eopt(self,expr,toks):
+        if toks: # level 4
+            t,ts = self.unpack(toks)
+            if t in self.starts or t not in self.keys:
+                es,rest = self.atom(toks)
                 return self.eopt(Node("App",[expr,es]),rest)
+        return (expr,toks)
+    def level3(self,toks):
+        e1,rest1 = self.term(toks)
+        return self.l3opt(e1,rest1)
+    def l3opt(self,expr,toks):
+        if toks:
+            t,ts = self.unpack(toks)
+            print( t,3,self.infix_tab[3])
+            if t in self.infix_tab[3][0]:
+                e2,rest = self.term(ts) 
+                return self.l3opt(Node(t,[expr,e2]),rest)
+            elif t in self.infix_tab[3][1]:
+                e2,rest = self.expr(ts) 
+                return self.l3opt(Node(t,[expr,e2]),rest)
         return (expr,toks)
     def term(self,toks):
         e1,rest1 = self.fator(toks)
@@ -171,51 +208,43 @@ class parser(Parser):
     def topt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t in self.infix_tab[1][0]:
-                e2,rest = self.term(ts) # left assoc  => 1 + 2 + 3 => (1 + 2) + 3 => (+ (+ 1 2) 3)
-                return self.eopt(Node(t,[expr,e2]),rest)
-            elif t in self.infix_tab[1][1]:
+            print( t,2,self.infix_tab[2])
+            if t in self.infix_tab[2][0]:
+                e2,rest = self.fator(ts) # left assoc  => 1 + 2 + 3 => (1 + 2) + 3 => (+ (+ 1 2) 3)
+                return self.topt(Node(t,[expr,e2]),rest)
+            elif t in self.infix_tab[2][1]:
                 e2,rest = self.expr(ts) # right assoc => 1 + 2 + 3 => 1 + (2 + 3) => (+ 1 (+ 2 3))
-                return self.eopt(Node(t,[expr,e2]),rest)
+                return self.topt(Node(t,[expr,e2]),rest)
         return (expr,toks)
     def fator(self,toks):
-        e1,rest1 = self.atom(toks)
+        e1,rest1 = self.level0(toks)
         return self.fopt(e1,rest1)
     def fopt(self,expr,toks):
         #print( expr, toks )
         if toks:
             t,ts = self.unpack(toks)
-            if t in self.infix_tab[0][0]:
-                e2,rest = self.fator(ts) # left
-                return self.topt(Node(t,[expr,e2]),rest)
-            elif t in self.infix_tab[0][1]:
+            print( t,1,self.infix_tab[1] )
+            if t in self.infix_tab[1][0]:
+                e2,rest = self.level0(ts) # left
+                return self.fopt(Node(t,[expr,e2]),rest)
+            elif t in self.infix_tab[1][1]:
                 e2,rest = self.expr(ts) # right 
-                return self.topt(Node(t,[expr,e2]),rest)
+                return self.fopt(Node(t,[expr,e2]),rest)
         return (expr,toks)
-    def items(self,toks):
-        #if toks:
-        t,ts = self.unpack(toks)
-        if t not in [',',')']:
-            e1,rest1 = self.expr(toks)
-            return self.rest_item( [e1] ,rest1)
-        elif t == ')':
-            return ([],toks)
-        else:
-            Expected(f"items {toks}")
-    def rest_item(self,e1,toks):
+    def level0(self,toks):
+        e1,rest1 = self.atom(toks)
+        return self.l0opt(e1,rest1)
+    def l0opt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
-            if t == ',':
-                x,xs = self.unpack(ts)
-                if x == ')': # drop t == drop ','
-                    return (e1,ts)
-                else:
-                    e2,rest2 = self.expr(ts)
-                    return self.rest_item( e1 + [e2],rest2)
-            else:
-                return (e1,toks)
-        else:
-            return (e1,toks)
+            print( t,0,self.infix_tab[0] )
+            if t in self.infix_tab[0][0]:
+                e2,rest = self.atom(ts) # left
+                return self.l0opt(Node(t,[expr,e2]),rest)
+            elif t in self.infix_tab[0][1]:
+                e2,rest = self.expr(ts) # right 
+                return self.l0opt(Node(t,[expr,e2]),rest)            
+        return (expr,toks)
 
 keywords = ["if","then","else",
             "let","=","in",
@@ -232,135 +261,6 @@ lex = Lex(spectab,keywords,separators)
 p   = parser(keywords)
 parse = p.read
 
-class Env(type):
-    def __new__(cls,name,parent,attrs):
-        attrs["__name__"] = name
-        if "__repr__" not in attrs.keys():
-            attrs["__repr__"] = lambda self:self.__name__
-        return type.__new__(cls,name,parent,attrs)
-class Empty(metaclass=Env):
-    pass
-class Extend(metaclass=Env):
-    def __init__(self,sym,val,env):
-        self.sym = sym
-        self.val = val
-        self.env = env
-    def __repr__(self):
-        return f"[ '{self.sym}':{self.val} , {repr(self.env)} ]"
-class enviroment(object):
-    def __init__(self,init=Empty()):
-        self.env = init
-    def __repr__(self):
-        return repr(self.env)
-    def extend(self,sym,val):
-        return enviroment( Extend(sym,val,self.env) )
-    def apply(self,sym):
-        # get sym
-        temp = self.env
-        while not isinstance(temp,Empty):
-            if isinstance(temp,enviroment):
-                temp = temp.env
-            if isinstance(temp,Extend):
-                ss,vv,temp = temp.sym,temp.val,temp.env
-                if sym == ss:
-                    return vv
-        else:
-            Expected(f"apply {sym} no bound variable in {self.env}")
-class Proc(object):
-    def __init__(self,var,body,env):
-        self.var = var
-        self.body = body
-        self.env = env
-    def __repr__(self):
-        return f"Proc({self.var})"
-def interpreter(ast,env):
-    #print( ast.name,ast.rest )
-    # can rewrite using state machine
-    if ast.name == "Var":
-        #print( "var:",ast.name,ast.rest[0],env )
-        return env.apply(ast.rest[0])
-    elif ast.name == "Paren":
-        #print("paren_env:",env)
-        return interpreter(ast.rest[0],env)
-    elif ast.name == "Num":
-        return ast.rest[0]
-    elif ast.name == "Tuple":
-        return tuple([interpreter(_ast,env) for _ast in ast.rest])
-    elif ast.name == "Let":
-        for k,v in ast.rest[0]:
-            val = interpreter(v,env) 
-            val = val if isinstance(val,tuple) else [val]
-            len_k = len(k)
-            if len_k == 1 and isinstance(val,tuple) and len(val) != 1:
-                val = [val]
-            len_v = len(val)
-            if len_k == len_v:
-                for n,v in zip(k,val):
-                    env = env.extend(n,v)
-                    #if isinstance(v,Proc):
-                    #    v.env = env
-            elif len_k < len_v:
-                Expected(f"value unpack to variable to greate ( have {len_v} value to {len_k} variable")
-            elif len_k > len_v and len_v > 0:
-                Expected(f"value unpack to variable to less ( have {len_v} value to {len_k} variable {ast}")
-            else:
-                Expected(f"value can't unpack to variable")
-        print("let_env:",env) 
-        return interpreter(ast.rest[1],env)
-    elif ast.name == "App":
-        fun = interpreter(ast.rest[0],env)
-        val = interpreter(ast.rest[1],env)
-        print( "apply:",fun,val )
-        if isinstance(fun,Proc):
-            val = val if isinstance(val,tuple) else [val]
-            sym = fun.var
-            body = fun.body
-            print( "apply:",env,fun.env )
-            env = fun.env
-            len_s = len(sym)
-            if len_s == 1 and isinstance(val,tuple) and len(val) != 1:
-                val = [val]
-            len_v = len(val)
-            if len_s == len_v:
-                for s,v in zip(sym,val):
-                    env = env.extend(s,v)
-                print( "app_env:",env )
-                return interpreter(body,env)
-            else:
-                Expected(f"function application args not equal {len_s} {len_v}")
-        else:
-            Expected(f"value {val} can't apply {fun}")
-    elif ast.name == "If":
-        cond,true,false = tuple(ast.rest)
-        cond_val = interpreter(cond,env)
-        if cond_val:
-            return interpreter(true,env)
-        return interpreter(false,env)
-    elif ast.name == "Fn":
-        var,body = ast.rest[0],ast.rest[1]
-        return Proc(var,body,env)
-    elif ast.name in ["+","-","*","/"]:
-        l,r = ast.rest[0],ast.rest[1]
-        if ast.name == "+":
-            return interpreter(l,env) + interpreter(r,env)
-        elif ast.name == '-':
-            return interpreter(l,env) - interpreter(r,env)
-        elif ast.name == '*':
-            return interpreter(l,env) * interpreter(r,env)
-        elif ast.name == '/':
-            return interpreter(l,env) / interpreter(r,env)
-    elif ast.name in p.user_infix:
-        fun = Node("Var",[ast.name])
-        arg = Node("Tuple",ast.rest)
-        print( fun,arg )
-        return interpreter( Node("App",[fun,arg]),env)
-    elif ast.name == 'Infix':
-        level,assoc,symop = tuple(ast.rest)
-        return Node("Var",[symop])
-    elif ast.name == 'Infixr':
-        level,assoc,symop = tuple(ast.rest)
-        return Node("Var",[symop])
-    else:
-        Expected(f"not implement {ast}")
-__all__ = ["lex","parse","interpreter","Empty","Extend","enviroment"]
+__all__ = ["lex","parse","p"]
+# "interpreter","Empty","Extend","enviroment"
 # implement a user datatype define
