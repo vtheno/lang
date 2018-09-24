@@ -1,0 +1,1 @@
+{"type": "dir", "fullname": "/", "name": "/", "items": [{"type": "dir", "fullname": "/test/", "name": "test", "items": [{"type": "dir", "fullname": "/test/abc/", "name": "abc", "items": []}]}, {"type": "dir", "fullname": "/abc/", "name": "abc", "items": [{"type": "dir", "fullname": "/abc/test/", "name": "test", "items": []}]}]}

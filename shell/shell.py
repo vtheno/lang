@@ -25,6 +25,7 @@ __doc__ = """
 \n LF 移动到下一行开头 换行  010
 \r CR 当前位置移动到本行开头 013
 \t HT 水平制表               009
+\b BS 回退                   008
 ascii 和 转意符
 """
 start = "\033["
@@ -41,10 +42,12 @@ line_end = "\n\r\b"
 line_start = "\r"
 kill_line = f"{start}K"
 clear = f"{start}2J"
+clear_line = f"{start}0K"
+new_line = "\n"
 def delete(n):
     return ('\b \b' * n )
-light = 0
-dark  = 1
+light = 1
+dark  = 0
 back = {
     'black':40,
     'red'  :41,
@@ -70,71 +73,16 @@ front = {
 }
 def green( s ):
     return f"{start}0;0;32m{s}{end}"
-from msvcrt import getch
+from msvcrt import getwch
 import sys
 def write(s):
     sys.stdout.write(s)
-def run():
-    buff = [ ]
-    write( clear )
-    write("\tWeclome vshell v1.0 beta.")
-    write(move_down(1))
-    write("\r")
-    while 1:
-        sys.stdout.flush()
-        c = getch()
-        try:
-            if 32 <= list(c)[0] <= 126:
-                write( str(c,'utf-8') )
-            #else:
-            #    write( str(c,'utf-8') )
-            #write( str(list(c)[0]) )
-        except Exception as e:
-            write( str(list(c)[0]) )
-        if c == b'\r':
-            break
-        elif c == bytes([11]):
-            # Ctrl + k
-            write( kill_line )
-        elif c == bytes([8]):
-            # backspace
-            write( delete(1) )
-        elif c == bytes([6]):
-            # Ctrl + f
-            write( move_right(1) )
-        elif c == bytes([1]):
-            # Ctrl + a
-            write( line_start )
-        elif c == bytes([5]):
-            # Ctrl + e
-            write( line_end )
-        elif c == bytes([2]):
-            # Ctrl + b
-            write( move_left(1) )
-        elif c == bytes([14]):
-            # Ctrl + n
-            write( move_down(1) )
-        elif c == bytes([16]):
-            # Ctrl + p
-            write( move_up(1) )
-        elif c == bytes([224]):
-            try:
-                sym = str(getch(),'utf-8')
-            except:
-                sym = ''
-            if sym == 'M':
-                # -> right arrow
-                write( move_right(1) )
-            elif sym == 'K':
-                # <- left arrow
-                write( move_left(1) )
-            elif sym == 'H':
-                # /|\ up arrow
-                #  |
-                write( move_up(1) )
-            elif sym == 'P':
-                #  |  down arrow
-                # \|/
-                write( move_down(1) )
 
-run()
+__all__ = [
+    "start","end",
+    "move_up","move_down","move_left","move_right",
+    "line_end","line_start","kill_line","clear",
+    "new_line","delete","light","dark","back","front","green",
+    "write","sys","getwch",
+    ]
+#print( input(">> ") )
