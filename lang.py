@@ -62,10 +62,12 @@ class parser(Parser):
             x,xs = self.unpack(toks)
             if x == '(':
                 e_var,rest1 = self.ids( xs )
+                print( "defns:",e_var )
                 e_val,rest2 = self.expr( self.strip("=",self.strip(')',rest1)) )
                 return ( (e_var,e_val),rest2 )
             else: # if (a,b,c) = 2 then a = b = c = 2 elif (a,b,c) = (1,2,3) then a = 1,b = 2,c = 3
-                e_var,rest1 = self.getid( toks )
+                e_var,rest1 = self.id( toks )
+                print( "defn:",e_var )
                 e_val,rest2 = self.expr ( self.strip("=",rest1) )
                 return ( ([e_var],e_val),rest2 )
         else:
@@ -89,8 +91,6 @@ class parser(Parser):
                 e3,rest3 = self.expr( self.strip("else",rest2) )
                 return (Node("If",[e1,e2,e3]),rest3)
             elif t == 'let':
-                #e1,rest1 = self.getid( ts ) #self.expr(ts)
-                #e2,rest2 = self.expr( self.strip("=",rest1) )
                 defns,rest2 = self.defns( ts )
                 e3,rest3 = self.expr( self.strip("in",rest2) )
                 #print( "let_defns:",defns,"|",e3 )
@@ -108,9 +108,10 @@ class parser(Parser):
                     ebody,rest2 = self.expr( self.strip("=>",rest1) )
                     return (Node("Fn",[evar,ebody]),rest2)
                 else:
-                    evar,rest1 = self.getid( ts )
+                    evar,rest1 = self.id( ts )
                     ebody,rest2 = self.expr( self.strip("=>",rest1) )
                     return (Node("Fn",[[evar],ebody]),rest2)
+                    """
             elif t == "infix":
                 assoc = 0
                 len_infix = len(self.infix_tab)
@@ -141,6 +142,7 @@ class parser(Parser):
                 self.user_infix += [symop]
                 self.infix_tab[level][assoc] += [symop]
                 return (Node("Infixr",[level,assoc,symop]), rest2)
+                    """
             elif t.isdigit():
                 num,rest1 = self.getnum( toks )
                 return (Node("Num",[num]),rest1)
@@ -150,18 +152,29 @@ class parser(Parser):
                 return (val,rest1)
         else:
             Expected(f"atom {toks}")
+    def id(self,toks):
+        t,ts = self.unpack(toks)
+        if not t.isdigit() and t not in self.keys:
+            x,xs = self.unpack(ts)
+            if x == ":":
+                typ,rest = self.getid(xs)
+                return ({t:Type(typ)},rest)
+            else:
+                return ({t:Type("a")},ts)
+        else:
+            Expected(f"Id '{t}' is num or {self.keys} have '{t}'\n {toks}")
     def ids(self,toks):
         t,ts = self.unpack(toks)
         if t == ")":
             return ([ ],toks)
         else:
-            id,rest = self.getid(toks)
+            id,rest = self.id(toks)
             return self.idsopt( [id],rest)
     def idsopt(self,expr,toks):
         if toks:
             t,ts = self.unpack(toks)
             if t == ",":
-                e2,rest2 = self.getid(ts)
+                e2,rest2 = self.id(ts)
                 return self.idsopt(expr + [e2],rest2)
         return (expr,toks)
     def items(self,toks):

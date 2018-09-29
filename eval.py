@@ -16,28 +16,30 @@ def interpreter(ast,env):
     elif ast.name == "Tuple":
         return Tuple([interpreter(_ast,env) for _ast in ast.rest])
     elif ast.name == "Let":
+        print( ast )
         for k,v in ast.rest[0]:
-            val = interpreter(v,env) 
-            val = val.val if isinstance(val,Tuple) else [val]
-            len_k = len(k)
-            if len_k == 1 and isinstance(val,tuple) and len(val) != 1:
-                val = [val]
-            len_v = len(val)
-            if len_k == len_v:
-                for n,v in zip(k,val):
-                    env = env.extend(n,v)
-                    if isinstance(v,Proc):
-                        #print( "v:",v.env )
-                        v.env = v.env.extend(n,v)
-                        # update the function name binding to enviroment
-                        # next update enviroment to the function env
-                        #print( "v:",v.env )
-            elif len_k < len_v:
-                Expected(f"value unpack to variable to greate ( have {len_v} value to {len_k} variable")
-            elif len_k > len_v and len_v > 0:
-                Expected(f"value unpack to variable to less ( have {len_v} value to {len_k} variable {ast}")
-            else:
-                Expected(f"value can't unpack to variable")
+            print( "let:",k,v )
+            #val = interpreter(v,env) 
+            #val = val.val if isinstance(val,Tuple) else [val]
+            #len_k = len(k)
+            #if len_k == 1 and isinstance(val,tuple) and len(val) != 1:
+            #    val = [val]
+            #len_v = len(val)
+            #if len_k == len_v:
+            #    for n,v in zip(k,val):
+            #        env = env.extend(n,v)
+            #        if isinstance(v,Proc):
+            #            #print( "v:",v.env )
+            #            v.env = v.env.extend(n,v)
+            #            # update the function name binding to enviroment
+            #            # next update enviroment to the function env
+            #            #print( "v:",v.env )
+            #elif len_k < len_v:
+            #    Expected(f"value unpack to variable to greate ( have {len_v} value to {len_k} variable")
+            #elif len_k > len_v and len_v > 0:
+            #    Expected(f"value unpack to variable to less ( have {len_v} value to {len_k} variable {ast}")
+            #else:
+            #    Expected(f"value can't unpack to variable")
         print("let_env:",env) 
         return interpreter(ast.rest[1],env)
     elif ast.name == "App":

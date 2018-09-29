@@ -1,6 +1,7 @@
 #coding=utf-8
 from collections import namedtuple
 Node = namedtuple("Node",["name","rest"])
+Type = namedtuple("Type",["name"])
 class Abort(Exception): pass
 def Expected(s : str):
     raise Abort( f'\033[0;31;43mError: {s} Expected. \033[0m')
@@ -37,5 +38,5 @@ class Parser(object):
             Expected(f"not all parser {rest}\n\t{out}")
         return out
 
-__all__ = ["Parser","Node",
+__all__ = ["Parser","Node","Type",
            "Abort","Expected"]

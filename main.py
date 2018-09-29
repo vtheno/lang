@@ -6,19 +6,19 @@ from eval import interpreter
 import sys
 from pprint import pprint
 env = enviroment()
-env = env.extend("~",interpreter(parse(lex.Tokenise("fn x => 0 - x")),env) )
-env = env.extend('abs',interpreter(parse(lex.Tokenise("fn i => if i then i else 0 - i")),env))
-parse(lex.Tokenise("infix ::"))
-env = env.extend('::',interpreter(parse(lex.Tokenise("fn (a,b) => (a,b)")),env) )
-env = env.extend('$',interpreter(parse(lex.Tokenise("fn a => (fn b => a b)")),env))
-parse(lex.Tokenise("infix 3 ."))
-env = env.extend('.',interpreter(parse(lex.Tokenise("fn (obj,method) => (method obj)")),env))
-env = env.extend('Y',interpreter(parse(lex.Tokenise("""
-fn f =>
-let 
-    self = fn x => (fn n => (f (x x)) n)
-in  fn n => (f (self self)) n
-""")),env))
+#env = env.extend("~",interpreter(parse(lex.Tokenise("fn x => 0 - x")),env) )
+#env = env.extend('abs',interpreter(parse(lex.Tokenise("fn i => if i then i else 0 - i")),env))
+#parse(lex.Tokenise("infix ::"))
+#env = env.extend('::',interpreter(parse(lex.Tokenise("fn (a,b) => (a,b)")),env) )
+#env = env.extend('$',interpreter(parse(lex.Tokenise("fn a => (fn b => a b)")),env))
+#parse(lex.Tokenise("infix 3 ."))
+#env = env.extend('.',interpreter(parse(lex.Tokenise("fn (obj,method) => (method obj)")),env))
+#env = env.extend('Y',interpreter(parse(lex.Tokenise("""
+#fn f =>
+#let 
+#    self = fn x => (fn n => (f (x x)) n)
+#in  fn n => (f (self self)) n
+#""")),env))
 
 print( "init_env:",end='')
 pprint(  env )
@@ -43,15 +43,15 @@ def repl():
             elif inp == ":e":
                 pprint(env)
             else:
-                try:
-                    inp = lex.Tokenise(stdin)
-                    ast = parse(inp)
-                    val = interpreter(ast,env)
-                    print("|>",val)
-                    print("\r=> ",end='')
-                    pprint(dict(ast._asdict()))
-                except Exception as e:
-                    print("||",e )
+                #try:
+                inp = lex.Tokenise(stdin)
+                ast = parse(inp)
+                val = interpreter(ast,env)
+                print("|>",val)
+                print("\r=> ",end='')
+                pprint(dict(ast._asdict()))
+                #except Exception as e:
+                #    print("||",e )
     except KeyboardInterrupt:
         print('\b\b\b\nrepl exit.')
 # need implement infix need first scan readline infix define add to enviroment and remove it line
